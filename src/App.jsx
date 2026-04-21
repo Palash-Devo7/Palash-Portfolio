@@ -104,7 +104,7 @@ const Hero = () => {
         {/* ── CENTER COLUMN (33%) — Warm Tan, portrait photo ── */}
         <div className="w-full lg:w-1/3 py-16 lg:py-0 bg-[#EBCFB2] relative overflow-hidden flex flex-col items-center justify-center order-1 lg:order-2">
           <img
-            src="palash_pic.jpeg"
+            src="palash Profile pic sample 1.jpeg"
             alt="Portrait of Palash Joshi"
             className="w-[60%] lg:w-[75%] aspect-square object-cover object-center shadow-md rounded-full lg:mt-0"
           />
