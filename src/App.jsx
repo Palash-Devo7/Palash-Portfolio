@@ -4,6 +4,9 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { LucideArrowRight, LucideCheckCircle2, LucideCpu, LucideDatabase, LucideGitBranch, LucideNetwork, LucideZap, Github, Linkedin, ChevronDown } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { LiveKitRoom, RoomAudioRenderer, useRoomContext } from '@livekit/components-react';
+import { RoomEvent } from 'livekit-client';
+import { SiPython, SiFastapi, SiNextdotjs, SiPytorch, SiHuggingface, SiDocker, SiTerraform, SiGooglecloud, SiNginx, SiRedis, SiN8N, SiMake, SiSelenium, SiSqlite, SiTradingview, SiReact, SiMeta } from 'react-icons/si';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -44,22 +47,108 @@ const Navbar = () => {
 
       {/* CENTER: Social links — aligned to center column */}
       <div className="hidden lg:flex lg:w-1/3 justify-center gap-6 items-center">
-        <a href="#" className="hover:text-accentTan transition-colors"><Github size={18} /></a>
-        <a href="#" className="hover:text-accentTan transition-colors"><Linkedin size={18} /></a>
+        <a href="https://github.com/Palash-Devo7" target="_blank" rel="noopener noreferrer" className="hover:text-accentTan transition-colors"><Github size={18} /></a>
+        <a href="https://www.linkedin.com/in/palash-joshi-901656286/" target="_blank" rel="noopener noreferrer" className="hover:text-accentTan transition-colors"><Linkedin size={18} /></a>
       </div>
 
       {/* RIGHT: Nav links — aligned to right column */}
       <div className="hidden lg:flex w-1/3 justify-end gap-10 items-center">
-        <a href="#work" className="hover:opacity-40 transition-opacity">latest work</a>
+        <a href="#projects" className="hover:opacity-40 transition-opacity">latest work</a>
 
-        <a href="#" className="bg-charcoal text-white px-5 py-2.5 rounded-full hover:bg-charcoal/90 transition-all hover:scale-105">schedule call</a>
+        <a href="https://calendly.com/palash-quantcortex/30min" target="_blank" rel="noopener noreferrer" className="bg-charcoal text-white px-5 py-2.5 rounded-full hover:bg-charcoal/90 transition-all hover:scale-105">schedule call</a>
       </div>
     </nav>
   );
 };
 
+function AgentTranscript() {
+  const room = useRoomContext();
+  const [committed, setCommitted] = useState([]); // final segments — fade to history
+  const [live, setLive] = useState('');            // non-final segments — updates word-by-word
+
+  useEffect(() => {
+    const handleTranscription = (segments, participant) => {
+      if (participant?.isLocal) return;
+
+      let finalText = '';
+      let liveText = '';
+
+      for (const seg of segments) {
+        if (seg.final && seg.text?.trim()) {
+          finalText += (finalText ? ' ' : '') + seg.text.trim();
+        } else if (!seg.final && seg.text?.trim()) {
+          liveText += (liveText ? ' ' : '') + seg.text.trim();
+        }
+      }
+
+      if (finalText) {
+        setCommitted(prev => [...prev.slice(-1), finalText]);
+        setLive('');
+      }
+      if (liveText) {
+        setLive(liveText);
+      }
+    };
+
+    room.on(RoomEvent.TranscriptionReceived, handleTranscription);
+    return () => room.off(RoomEvent.TranscriptionReceived, handleTranscription);
+  }, [room]);
+
+  const hasContent = committed.length > 0 || live;
+
+  if (!hasContent) {
+    return (
+      <div className="text-center space-y-1">
+        <p className="text-[10px] font-black tracking-[0.2em] uppercase text-accentTan">Assistant Listening</p>
+        <p className="text-[11px] font-medium text-white/40 italic leading-snug">"Ask about research or work"</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full text-center space-y-1">
+      {committed.map((line, i) => (
+        <p key={i} className="text-[10px] leading-relaxed italic text-white/30 transition-all duration-500">
+          "{line}"
+        </p>
+      ))}
+      {live && (
+        <p className="text-[10px] leading-relaxed italic text-white/80 font-medium transition-all duration-100">
+          "{live}"
+        </p>
+      )}
+    </div>
+  );
+}
+
 const Hero = () => {
   const containerRef = useRef(null);
+  const [token, setToken] = useState("");
+  const [connectionUrl, setConnectionUrl] = useState("");
+  const [agentPhone, setAgentPhone] = useState("");
+  const [agentStatus, setAgentStatus] = useState("idle"); // idle, connecting, success, error
+
+  const handleSummon = async () => {
+    setAgentStatus("connecting");
+
+    try {
+      const roomName = `portfolio-call-${Date.now()}`;
+      // Connect to your real Python backend on port 8040
+      const response = await fetch(`http://localhost:8040/token?room=${roomName}&name=Recruiter`);
+
+      if (!response.ok) throw new Error("Failed to fetch token");
+
+      const data = await response.json();
+      setToken(data.token);
+      setConnectionUrl(data.url);
+      setAgentStatus("success");
+
+    } catch (error) {
+      console.error("Connection error:", error);
+      setAgentStatus("error");
+      setTimeout(() => setAgentStatus("idle"), 3000);
+    }
+  };
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -86,7 +175,7 @@ const Hero = () => {
       <div className="flex-1 flex flex-col lg:flex-row pb-0">
 
         {/* ── LEFT COLUMN (33%) — Pale Yellow, outlined name Z-pattern ── */}
-        <div className="w-full lg:w-1/3 min-h-[40vh] bg-[#FFF4C2] flex flex-col justify-center px-6 lg:px-8 relative overflow-hidden order-3 lg:order-1 border-t lg:border-t-0 border-charcoal/10">
+        <div className="w-full lg:w-1/3 min-h-[40vh] bg-[#FFF4C2] hidden lg:flex flex-col justify-center px-6 lg:px-8 relative overflow-hidden order-3 lg:order-1 border-t lg:border-t-0 border-charcoal/10">
           <h1
             className="hero-reveal font-sans font-black select-none text-transparent w-full flex flex-col justify-center"
             style={{
@@ -102,16 +191,129 @@ const Hero = () => {
         </div>
 
         {/* ── CENTER COLUMN (33%) — Warm Tan, portrait photo ── */}
-        <div className="w-full lg:w-1/3 py-16 lg:py-0 bg-[#EBCFB2] relative overflow-hidden flex flex-col items-center justify-center order-1 lg:order-2">
-          <img
-            src="palash Profile pic sample 1.jpeg"
-            alt="Portrait of Palash Joshi"
-            className="w-[60%] lg:w-[75%] aspect-square object-cover object-center shadow-md rounded-full lg:mt-0"
-          />
-          <div className="w-max mt-8 flex justify-center gap-10 items-center text-xs font-semibold text-charcoal tracking-wider" style={{ fontFamily: '"Inter", sans-serif' }}>
-            <button className="border-b border-charcoal/30 pb-1 hover:border-charcoal hover:opacity-70 transition-all cursor-pointer">Latest Work</button>
-            <button className="border-b border-charcoal/30 pb-1 hover:border-charcoal hover:opacity-70 transition-all cursor-pointer">Case Studies</button>
+        <div className="w-full lg:w-1/3 py-10 lg:py-8 bg-[#EBCFB2] relative overflow-hidden flex flex-col items-center justify-center order-1 lg:order-2 border-x border-charcoal/5">
+          <div className="relative group">
+            {/* Decorative ring */}
+            <div className="absolute inset-x-[-12px] inset-y-[-12px] border-2 border-charcoal/10 rounded-full animate-[spin_15s_linear_infinite] pointer-events-none"></div>
+            <img
+              src="palash Profile pic sample 1.jpeg"
+              alt="Portrait of Palash Joshi"
+              className="w-[200px] lg:w-[300px] aspect-square object-cover object-center shadow-2xl rounded-full relative z-10 border-4 border-white"
+            />
           </div>
+
+          {/* --- Voice Agent Launcher (Simple Recruiter Version) --- */}
+          <div className="mt-6 w-full max-w-[260px] bg-white/60 backdrop-blur-3xl border border-charcoal/10 rounded-[2rem] p-5 shadow-2xl relative z-20 overflow-hidden">
+            <div className="flex flex-col gap-1 mb-4 px-1 relative z-10">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-accentTan animate-pulse"></div>
+                <span className="text-[10px] font-black text-charcoal tracking-[0.25em] uppercase">Connect via AI Agent</span>
+              </div>
+              <p className="text-[11px] font-medium text-charcoal/60 leading-tight mt-1">
+                Talk to my AI Voice Assistant to explore my research and work in real time.
+              </p>
+            </div>
+
+            <div className="space-y-4 relative z-10">
+              {agentStatus === "idle" ? (
+                <button
+                  onClick={handleSummon}
+                  className="w-full py-4 bg-charcoal text-white rounded-[1.25rem] text-[9px] font-black uppercase tracking-[0.2em] transition-all hover:bg-accentTan hover:text-charcoal hover:scale-[1.02] active:scale-95 shadow-xl flex flex-col items-center justify-center gap-1 group border border-white/5"
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Start Voice Chat</span>
+                    <LucideZap size={12} className="group-hover:animate-bounce" />
+                  </div>
+                  <span className="text-[7px] text-white/40 tracking-[0.2em] font-bold group-hover:text-charcoal/60 transition-colors">Uplink: Ready</span>
+                </button>
+              ) : agentStatus === "connecting" ? (
+                <div className="bg-charcoal text-white rounded-2xl p-6 space-y-4 animate-pulse">
+                  <div className="flex items-center justify-center h-10 gap-1.5">
+                    {[...Array(6)].map((_, i) => (
+                      <div key={i} className="w-1 h-8 bg-accentTan rounded-full animate-bounce" style={{ animationDelay: `${i * 0.1}s` }}></div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] font-black text-center tracking-widest uppercase">Initializing Agent...</p>
+                </div>
+              ) : agentStatus === "success" && token ? (
+                <div className="bg-charcoal text-white rounded-[2rem] p-6 border border-accentTan/30 shadow-2xl animate-in zoom-in-95 duration-500 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none"></div>
+                  <LiveKitRoom
+                    video={false}
+                    audio={true}
+                    token={token}
+                    serverUrl={connectionUrl}
+                    onConnected={() => {
+                      console.log("LiveKit room connected");
+                    }}
+                    onError={(error) => {
+                      console.error("LiveKit room error:", error);
+                      setAgentStatus("error");
+                    }}
+                    onDisconnected={() => {
+                      setAgentStatus("idle");
+                      setToken("");
+                      setConnectionUrl("");
+                    }}
+                    className="relative z-10 flex flex-col items-center gap-6"
+                  >
+                    <RoomAudioRenderer />
+
+                    {/* Minimal Header */}
+                    <div className="w-full flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                        <span className="text-[8px] font-black tracking-[0.2em] uppercase text-white/60">Active Link</span>
+                      </div>
+                      <LucideNetwork size={12} className="text-accentTan/40" />
+                    </div>
+
+                    {/* Premium Visualizer */}
+                    <div className="relative w-20 h-20 flex items-center justify-center">
+                      <div className="absolute inset-0 bg-accentTan/20 rounded-full animate-ping opacity-20"></div>
+                      <div className="absolute inset-0 bg-accentTan/10 rounded-full animate-pulse scale-150 blur-xl"></div>
+                      <div className="w-14 h-14 bg-accentTan rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(196,145,106,0.3)] relative z-10 transition-transform hover:scale-105 duration-500">
+                        <LucideZap size={24} className="text-charcoal fill-charcoal/20" />
+                      </div>
+
+                      {/* Orbiting dots */}
+                      <div className="absolute inset-0 animate-[spin_8s_linear_infinite]">
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1 h-1 bg-accentTan/40 rounded-full"></div>
+                      </div>
+                    </div>
+
+                    <AgentTranscript />
+
+                    <button
+                      onClick={() => { setToken(""); setAgentStatus("idle"); }}
+                      className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] transition-all hover:bg-red-500/10 hover:border-red-500/20 hover:text-red-400 group"
+                    >
+                      Terminate Session
+                    </button>
+                  </LiveKitRoom>
+                </div>
+              ) : (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-6 text-center">
+                  <p className="text-[10px] font-black text-red-500 tracking-widest uppercase">Connection Failed</p>
+                  <button onClick={() => setAgentStatus("idle")} className="text-[9px] text-charcoal/40 mt-4 underline">Try Again</button>
+                </div>
+              )}
+            </div>
+
+            <style>
+              {`
+                @keyframes wave {
+                  0%, 100% { transform: scaleY(0.4); }
+                  50% { transform: scaleY(1); }
+                }
+                [class*="lk-device-select"],
+                [class*="lk-media-device"],
+                [class*="lk-button-group"],
+                [class*="lk-control-bar"] { display: none !important; }
+              `}
+            </style>
+          </div>
+
           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 hidden lg:flex flex-col items-center animate-bounce opacity-40">
             <ChevronDown size={20} />
           </div>
@@ -147,8 +349,8 @@ const Hero = () => {
               </div>
 
               <div className="flex items-center gap-4 pt-6">
-                <a 
-                  href="/palash_resume_AIEngineer.pdf" 
+                <a
+                  href="/palash_resume_AIEngineer.pdf"
                   download="Palash_Joshi_CV.pdf"
                   className="bg-charcoal text-white px-8 py-3.5 rounded-full font-sans font-semibold text-sm hover:bg-charcoal/85 hover:scale-105 transition-all text-center cursor-pointer shadow-sm inline-block"
                 >
@@ -619,21 +821,28 @@ const ExperienceTrek = () => {
   const sectionRef = useRef(null);
   const triggerRef = useRef(null);
   const pathRef = useRef(null);
+  const cardRefs = useRef([]);
 
+  // scrollOffset = px of scroll at which the animated path reaches this peak
+  // Calculated from cumulative polyline segment lengths as a fraction of total path length (3132.8),
+  // multiplied by the path-drawing scroll range (3500 * 0.8 = 2800).
   const experiences = [
     {
       id: "secretweapon",
+      abbr: "SWTS",
       phase: "01 / BASE CAMP",
-      company: "Secret Weapon Trading",
+      company: "Secret Weapon Trading Solutions",
       role: "Algorithm Developer",
       period: "2024 - 2025",
       projects: "Algo Trading Logic",
       mastery: ["Pine Script", "Performance", "Python"],
       desc: "Starting the climb. Built core backtesting logic and evaluated market strategies.",
-      peakCoords: { x: 400, y: 350 }
+      peakCoords: { x: 400, y: 350 },
+      scrollOffset: 381
     },
     {
       id: "growwstacks",
+      abbr: "GS",
       phase: "02 / ASCENDING",
       company: "GrowwStacks",
       role: "Software Engineer",
@@ -641,10 +850,12 @@ const ExperienceTrek = () => {
       projects: "80+ Deployments",
       mastery: ["Docker", "Terraform", "Azure", "RAG"],
       desc: "Massive scale-up. Delivered automation across 80+ enterprise projects.",
-      peakCoords: { x: 1200, y: 250 }
+      peakCoords: { x: 1200, y: 250 },
+      scrollOffset: 1150
     },
     {
       id: "nxl",
+      abbr: "NXL",
       phase: "03 / HIGH SLOPE",
       company: "NXL",
       role: "AI Developer",
@@ -652,29 +863,32 @@ const ExperienceTrek = () => {
       projects: "AI SDR Pipelines",
       mastery: ["n8n", "LLM Logic", "CRM"],
       desc: "Specializing in the thin-air of AI logic and automated sales agents.",
-      peakCoords: { x: 2000, y: 150 }
+      peakCoords: { x: 2000, y: 150 },
+      scrollOffset: 1954
     },
     {
       id: "quantcortex",
+      abbr: "QC",
       phase: "04 / THE CURRENT SUMMIT",
       company: "QuantCortex",
       role: "AI Researcher",
       period: "Present",
-      projects: "1 Massive Core",
+      projects: "AI Powered Equity Research",
       mastery: ["FinBERT", "ChromaDB", "LLaMA-3.3"],
       desc: "The current vantage point. Architecting a full-stack, solo Indian Equity platform.",
-      peakCoords: { x: 2800, y: 50 }
+      peakCoords: { x: 2800, y: 50 },
+      scrollOffset: 2800
     }
   ];
 
+  const totalWidth = 3500;
   // The Full Ridge (for the background shadow)
-  const fullRidgeData = "M0,500 L400,350 L800,450 L1200,250 L1600,400 L2000,150 L2400,350 L2800,50 L3500,500";
-  // The Journey Path (stops exactly at the final peak)
-  const journeyPathData = "M0,500 L400,350 L800,450 L1200,250 L1600,400 L2000,150 L2400,350 L2800,50";
+  const fullRidgeData = "M0,500 L400,350 L800,450 L1200,250 L1600,400 L2000,150 L2400,350 L2800,50 L3500,50";
+  // The Journey Path — plateau at the summit, still walking
+  const journeyPathData = "M0,500 L400,350 L800,450 L1200,250 L1600,400 L2000,150 L2400,350 L2800,50 L3500,50";
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      const totalWidth = 3500;
 
       // Horizontal Scroll Pinning
       gsap.to(sectionRef.current, {
@@ -701,7 +915,6 @@ const ExperienceTrek = () => {
         scrollTrigger: {
           trigger: triggerRef.current,
           start: "top top",
-          // Map drawing end to the point on the track where the peak is reached (~80% of total width)
           end: () => `+=${totalWidth * 0.8}`,
           scrub: 0.5,
         }
@@ -716,6 +929,24 @@ const ExperienceTrek = () => {
           end: () => `+=${totalWidth}`,
           scrub: true,
         }
+      });
+
+      // Set initial hidden state for each card
+      cardRefs.current.forEach(card => {
+        if (card) gsap.set(card, { opacity: 0, x: 16 });
+      });
+
+      // Reveal each card when the animated path line crosses its peak
+      experiences.forEach((exp, i) => {
+        const card = cardRefs.current[i];
+        if (!card) return;
+        ScrollTrigger.create({
+          trigger: triggerRef.current,
+          start: "top top",
+          end: () => `+=${exp.scrollOffset}`,
+          onLeave: () => gsap.to(card, { opacity: 1, x: 0, duration: 0.55, ease: "power2.out" }),
+          onLeaveBack: () => gsap.to(card, { opacity: 0, x: 16, duration: 0.3, ease: "power2.in" }),
+        });
       });
 
     }, triggerRef);
@@ -735,7 +966,39 @@ const ExperienceTrek = () => {
         </div>
       </div>
 
-      <div ref={sectionRef} className="h-screen relative flex items-center" style={{ width: '3500px' }}>
+      <div ref={sectionRef} className="h-screen relative flex items-center" style={{ width: `${totalWidth}px` }}>
+
+        {/* Experience Cards — absolutely positioned to the right of each peak marker.
+            SVG maps 3500×500 viewBox onto 3500px wide × 80vh tall, so:
+            screen-x = svgX (1:1), screen-top = 20vh + (svgY/500)*80vh */}
+        {experiences.map((exp, i) => (
+          <div
+            key={exp.id}
+            ref={el => { cardRefs.current[i] = el; }}
+            className="absolute z-10"
+            style={{
+              left: `${exp.peakCoords.x + 44}px`,
+              top: `calc(20vh + ${(exp.peakCoords.y / 500) * 80}vh - 88px)`,
+              width: '260px',
+            }}
+          >
+            <div className="bg-white/90 backdrop-blur-md border border-charcoal/10 p-6 rounded-2xl shadow-xl">
+              <div className="flex justify-between items-start mb-3">
+                <span className="font-mono text-[10px] bg-charcoal text-white px-2 py-0.5 rounded uppercase">{exp.period}</span>
+                <span className="text-[11px] font-bold text-charcoal">{exp.projects}</span>
+              </div>
+              <h4 className="text-xl font-heading font-bold text-charcoal leading-tight mb-2">{exp.company}</h4>
+              <p className="text-xs text-charcoal/70 leading-relaxed mb-4">{exp.desc}</p>
+              <div className="flex flex-wrap gap-1.5 border-t border-charcoal/10 pt-3">
+                {exp.mastery.map(m => (
+                  <span key={m} className="text-[9px] font-mono font-bold uppercase tracking-widest text-charcoal/50 bg-charcoal/5 px-2 py-0.5 rounded">
+                    {m}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
 
         {/* The Mountain Path SVG */}
         <svg viewBox="0 0 3500 500" className="absolute left-0 bottom-0 w-full h-[80%] overflow-visible">
@@ -759,46 +1022,27 @@ const ExperienceTrek = () => {
             fill="none" stroke="#8E7B5F" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"
           />
 
-          {/* Peak Indicators & Content */}
+          {/* Peak markers — dot + pulse ring + phase/role label only */}
           {experiences.map((exp) => (
             <foreignObject
               key={exp.id}
-              x={exp.peakCoords.x - 150}
-              y={exp.peakCoords.y - 300}
-              width="350"
-              height="400"
+              x={exp.peakCoords.x - 120}
+              y={exp.peakCoords.y - 8}
+              width="240"
+              height="140"
             >
-              <div className="flex flex-col items-center justify-end h-full group p-4">
-                {/* Information Card */}
-                <div className="bg-white/90 backdrop-blur-md border border-charcoal/10 p-8 rounded-2xl shadow-xl mb-12 opacity-0 group-hover:opacity-100 transition-all duration-500 translate-y-4 group-hover:translate-y-0 max-w-[300px]">
-                  <div className="flex justify-between items-start mb-4">
-                    <span className="font-mono text-[10px] bg-charcoal text-white px-2 py-0.5 rounded uppercase">{exp.period}</span>
-                    <div className="text-[12px] font-bold text-charcoal">{exp.projects}</div>
+              <div className="flex flex-col items-center">
+                {/* Landmark dot */}
+                <div className="relative w-10 h-10">
+                  <div className="w-10 h-10 bg-charcoal rounded-full flex items-center justify-center border-4 border-accentTan shadow-2xl">
+                    <span className="text-accentTan font-black font-mono" style={{ fontSize: exp.abbr.length > 3 ? '7px' : '10px' }}>{exp.abbr}</span>
                   </div>
-                  <h4 className="text-2xl font-heading font-bold text-charcoal leading-tight mb-3">{exp.company}</h4>
-                  <p className="text-sm text-charcoal/70 leading-relaxed mb-6">{exp.desc}</p>
-                  <div className="flex flex-wrap gap-2 border-t border-charcoal/10 pt-4">
-                    {exp.mastery.map(m => (
-                      <span key={m} className="text-[10px] font-mono font-bold uppercase tracking-widest text-charcoal/50 bg-charcoal/5 px-2 py-1 rounded">
-                        {m}
-                      </span>
-                    ))}
-                  </div>
+                  <div className="absolute inset-0 w-10 h-10 rounded-full border-2 border-accentTan animate-ping opacity-20"></div>
                 </div>
-
-                {/* The Landmark Marker */}
-                <div className="relative">
-                  <div className="w-12 h-12 bg-charcoal rounded-full flex items-center justify-center border-4 border-accentTan group-hover:scale-125 transition-transform duration-500 shadow-2xl">
-                    <span className="text-accentTan font-black text-xs font-mono">{exp.id.slice(0, 2).toUpperCase()}</span>
-                  </div>
-                  {/* Pulse Effect */}
-                  <div className="absolute inset-0 w-12 h-12 rounded-full border-2 border-accentTan animate-ping opacity-20"></div>
-                </div>
-
-                {/* Label (always visible) */}
-                <div className="mt-4 text-center">
-                  <p className="font-mono text-[10px] font-bold text-charcoal/30 uppercase tracking-[0.2em]">{exp.phase}</p>
-                  <p className="font-heading font-black text-charcoal tracking-tighter uppercase text-sm mt-1">{exp.role}</p>
+                {/* Label */}
+                <div className="mt-3 text-center space-y-1.5">
+                  <p className="font-mono text-[9px] font-bold text-charcoal/60 uppercase tracking-[0.12em] whitespace-nowrap">{exp.phase}</p>
+                  <p className="font-heading font-black text-charcoal tracking-tight uppercase text-[13px] whitespace-nowrap">{exp.role}</p>
                 </div>
               </div>
             </foreignObject>
@@ -819,10 +1063,26 @@ const ExperienceTrek = () => {
 
 const TechMarquee = () => {
   const techs = [
-    "Python", "FastAPI", "Next.js 15", "PyTorch", "Transformers",
-    "ChromaDB", "Groq", "LLaMA-3.3", "Docker", "Terraform",
-    "Azure", "GCP", "Nginx", "Redis", "n8n", "Make.com",
-    "Selenium", "SQLite", "Pine Script", "React"
+    { name: "Python", Icon: SiPython, color: "#3776AB" },
+    { name: "FastAPI", Icon: SiFastapi, color: "#009688" },
+    { name: "Next.js", Icon: SiNextdotjs, color: "#ffffff" },
+    { name: "PyTorch", Icon: SiPytorch, color: "#EE4C2C" },
+    { name: "Transformers", Icon: SiHuggingface, color: "#FFD21E" },
+    { name: "ChromaDB", Icon: null, color: null },
+    { name: "Groq", Icon: null, color: null },
+    { name: "LLaMA", Icon: SiMeta, color: "#0082FB" },
+    { name: "Docker", Icon: SiDocker, color: "#2496ED" },
+    { name: "Terraform", Icon: SiTerraform, color: "#7B42BC" },
+    { name: "Azure", Icon: null, color: null },
+    { name: "GCP", Icon: SiGooglecloud, color: "#4285F4" },
+    { name: "Nginx", Icon: SiNginx, color: "#009639" },
+    { name: "Redis", Icon: SiRedis, color: "#FF4438" },
+    { name: "n8n", Icon: SiN8N, color: "#EA4B71" },
+    { name: "Make.com", Icon: SiMake, color: "#6D00CC" },
+    { name: "Selenium", Icon: SiSelenium, color: "#43B02A" },
+    { name: "SQLite", Icon: SiSqlite, color: "#44A1C7" },
+    { name: "Pine Script", Icon: SiTradingview, color: "#2962FF" },
+    { name: "React", Icon: SiReact, color: "#61DAFB" },
   ];
 
   return (
@@ -835,10 +1095,13 @@ const TechMarquee = () => {
       <div className="flex whitespace-nowrap overflow-hidden group">
         <div className="flex animate-marquee group-hover:[animation-play-state:paused]">
           {[...techs, ...techs].map((tech, i) => (
-            <div key={i} className="flex items-center gap-4 mx-12">
-              <div className="w-1.5 h-1.5 bg-accentTan rounded-full"></div>
-              <span className="text-white/40 font-mono text-sm uppercase tracking-[0.3em] font-bold hover:text-accentTan transition-colors cursor-default">
-                {tech}
+            <div key={i} className="flex items-center gap-3 mx-10 group/item cursor-default">
+              {tech.Icon
+                ? <tech.Icon size={20} style={{ color: tech.color }} className="opacity-70 group-hover/item:opacity-100 transition-opacity shrink-0" />
+                : <div className="w-1.5 h-1.5 bg-accentTan rounded-full shrink-0" />
+              }
+              <span className="text-white/40 font-mono text-sm uppercase tracking-[0.3em] font-bold group-hover/item:text-white/80 transition-colors">
+                {tech.name}
               </span>
             </div>
           ))}
@@ -853,7 +1116,7 @@ const TechMarquee = () => {
           }
           .animate-marquee {
             display: flex;
-            animation: marquee 30s linear infinite;
+            animation: marquee 35s linear infinite;
           }
         `}
       </style>
@@ -882,19 +1145,19 @@ const Footer = () => {
           <div className="md:col-span-3 space-y-4">
             <p className="font-mono text-[10px] text-cream/30 uppercase tracking-widest">Navigation</p>
             <ul className="space-y-2 font-sans">
-              <li><a href="#" className="hover:text-accentTan transition-colors">Work</a></li>
+              <li><a href="#work" className="hover:text-accentTan transition-colors">Work</a></li>
 
-              <li><a href="#" className="hover:text-accentTan transition-colors">Protocol</a></li>
-              <li><a href="#" className="hover:text-accentTan transition-colors">QuantCortex</a></li>
+              <li><a href="#protocol" className="hover:text-accentTan transition-colors">Protocol</a></li>
+              <li><a href="https://quantcortex.in" target="_blank" rel="noopener noreferrer" className="hover:text-accentTan transition-colors">QuantCortex</a></li>
             </ul>
           </div>
 
           <div className="md:col-span-3 space-y-4">
             <p className="font-mono text-[10px] text-cream/30 uppercase tracking-widest">Social</p>
             <ul className="space-y-2 font-sans">
-              <li><a href="#" className="hover:text-accentTan transition-colors">LinkedIn</a></li>
-              <li><a href="#" className="hover:text-accentTan transition-colors">GitHub</a></li>
-              <li><a href="#" className="hover:text-accentTan transition-colors">Twitter (X)</a></li>
+              <li><a href="https://www.linkedin.com/in/palash-joshi-901656286/" target="_blank" rel="noopener noreferrer" className="hover:text-accentTan transition-colors">LinkedIn</a></li>
+              <li><a href="https://github.com/Palash-Devo7" target="_blank" rel="noopener noreferrer" className="hover:text-accentTan transition-colors">GitHub</a></li>
+              <li><a href="mailto:palash@quantcortex.in" className="hover:text-accentTan transition-colors">Email</a></li>
             </ul>
           </div>
         </div>
@@ -945,12 +1208,12 @@ export default function App() {
             Ready to <span className="drama italic text-accentTan underline decoration-accentTan/20 decoration-8">Sovereignize?</span>
           </h2>
           <div className="flex flex-col md:flex-row items-center justify-center gap-6">
-            <button className="bg-charcoal text-cream px-10 py-5 rounded-full font-heading font-bold text-xl magnetic">
+            <a href="mailto:palash@quantcortex.in" className="bg-charcoal text-cream px-10 py-5 rounded-full font-heading font-bold text-xl magnetic">
               Let's Build Together
-            </button>
-            <button className="border border-charcoal/20 text-charcoal px-10 py-5 rounded-full font-heading font-bold text-xl magnetic hover:bg-charcoal hover:text-cream transition-colors duration-500">
+            </a>
+            <a href="https://quantcortex.in" target="_blank" rel="noopener noreferrer" className="border border-charcoal/20 text-charcoal px-10 py-5 rounded-full font-heading font-bold text-xl magnetic hover:bg-charcoal hover:text-cream transition-colors duration-500">
               Explore QuantCortex
-            </button>
+            </a>
           </div>
         </div>
       </section>

@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+pydantic
+python-dotenv
+PyJWT
+numpy
+livekit-agents
+livekit-plugins-deepgram
+livekit-plugins-groq
+livekit-plugins-silero
+livekit
