@@ -8,9 +8,24 @@ import threading
 import uuid
 import numpy as np
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from collections import defaultdict
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 import jwt
+
+_rate_store: dict = defaultdict(list)
+_rate_lock = threading.Lock()
+RATE_MAX = 5
+RATE_WINDOW = 60
+
+def _check_rate_limit(ip: str) -> bool:
+    now = time.time()
+    with _rate_lock:
+        _rate_store[ip] = [t for t in _rate_store[ip] if now - t < RATE_WINDOW]
+        if len(_rate_store[ip]) >= RATE_MAX:
+            return False
+        _rate_store[ip].append(now)
+        return True
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -261,11 +276,19 @@ def session_load(worker) -> float:
     return min(len(worker.active_jobs) / 2, 1.0)
 
 @app.get("/token")
-async def get_token(room: str, name: str = "Recruiter"):
+async def get_token(request: Request, room: str, name: str = "Recruiter"):
+    client_ip = request.client.host
+    if not _check_rate_limit(client_ip):
+        raise HTTPException(status_code=429, detail="Too many requests — try again later")
+
+    if not room or len(room) > 80 or not all(c.isalnum() or c in "-_" for c in room):
+        raise HTTPException(status_code=400, detail="Invalid room name")
+    name = name[:40]
+
     url = os.getenv("LIVEKIT_URL")
     key = os.getenv("LIVEKIT_API_KEY")
     secret = os.getenv("LIVEKIT_API_SECRET")
-    
+
     if not url or not key or not secret:
         raise HTTPException(status_code=500, detail="LiveKit credentials missing")
         

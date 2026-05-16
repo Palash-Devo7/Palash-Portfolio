@@ -121,11 +121,22 @@ function AgentTranscript() {
   );
 }
 
+function SessionControls({ onTerminate }) {
+  const room = useRoomContext();
+  return (
+    <button
+      onClick={async () => { await room.disconnect(); onTerminate(); }}
+      className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] transition-all hover:bg-red-500/10 hover:border-red-500/20 hover:text-red-400 group"
+    >
+      Terminate Session
+    </button>
+  );
+}
+
 const Hero = () => {
   const containerRef = useRef(null);
   const [token, setToken] = useState("");
   const [connectionUrl, setConnectionUrl] = useState("");
-  const [agentPhone, setAgentPhone] = useState("");
   const [agentStatus, setAgentStatus] = useState("idle"); // idle, connecting, success, error
 
   const handleSummon = async () => {
@@ -133,8 +144,7 @@ const Hero = () => {
 
     try {
       const roomName = `portfolio-call-${Date.now()}`;
-      // Connect to your real Python backend on port 8040
-      const response = await fetch(`http://localhost:8040/token?room=${roomName}&name=Recruiter`);
+      const response = await fetch(`https://portfolio-api.quantcortex.in/token?room=${roomName}&name=Recruiter`);
 
       if (!response.ok) throw new Error("Failed to fetch token");
 
@@ -284,12 +294,7 @@ const Hero = () => {
 
                     <AgentTranscript />
 
-                    <button
-                      onClick={() => { setToken(""); setAgentStatus("idle"); }}
-                      className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] transition-all hover:bg-red-500/10 hover:border-red-500/20 hover:text-red-400 group"
-                    >
-                      Terminate Session
-                    </button>
+                    <SessionControls onTerminate={() => { setToken(""); setAgentStatus("idle"); }} />
                   </LiveKitRoom>
                 </div>
               ) : (
@@ -1147,7 +1152,7 @@ const Footer = () => {
             <ul className="space-y-2 font-sans">
               <li><a href="#work" className="hover:text-accentTan transition-colors">Work</a></li>
 
-              <li><a href="#protocol" className="hover:text-accentTan transition-colors">Protocol</a></li>
+              <li><a href="#projects" className="hover:text-accentTan transition-colors">Projects</a></li>
               <li><a href="https://quantcortex.in" target="_blank" rel="noopener noreferrer" className="hover:text-accentTan transition-colors">QuantCortex</a></li>
             </ul>
           </div>
@@ -1178,22 +1183,23 @@ const Footer = () => {
 // --- Main App ---
 
 export default function App() {
+  useEffect(() => {
+    const handleScroll = () => {
+      const h = document.documentElement;
+      const scrollTop = h.scrollTop || document.body.scrollTop;
+      const scrollHeight = (h.scrollHeight || document.body.scrollHeight) - h.clientHeight;
+      const progress = scrollHeight > 0 ? scrollTop / scrollHeight : 0;
+      const el = document.getElementById('scroll-progress');
+      if (el) el.style.transform = `scaleX(${progress})`;
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   return (
     <main className="selection:bg-accentTan selection:text-charcoal text-charcoal">
       {/* Scroll Progress Bar */}
       <div className="fixed top-0 left-0 w-full h-1 z-[100] origin-left bg-accentTan scale-x-0" id="scroll-progress"></div>
-      <script>
-        {`
-          window.addEventListener('scroll', () => {
-            const h = document.documentElement;
-            const b = document.body;
-            const st = 'scrollTop';
-            const sh = 'scrollHeight';
-            const progress = (h[st] || b[st]) / ((h[sh] || b[sh]) - h.clientHeight);
-            document.getElementById('scroll-progress').style.transform = \`scaleX(\${progress})\`;
-          });
-        `}
-      </script>
 
       <Hero />
       <Features />
@@ -1202,7 +1208,7 @@ export default function App() {
       <ProjectShowcase />
 
       {/* Final CTA Section */}
-      <section className="bg-cream py-40 flex flex-center px-6">
+      <section className="bg-cream py-40 flex justify-center items-center px-6">
         <div className="max-w-4xl mx-auto text-center space-y-12">
           <h2 className="text-5xl md:text-8xl font-heading font-bold tracking-tighter leading-none">
             Ready to <span className="drama italic text-accentTan underline decoration-accentTan/20 decoration-8">Sovereignize?</span>
