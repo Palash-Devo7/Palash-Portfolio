@@ -68,8 +68,6 @@ function AgentTranscript({ transcriptRef }) {
 
   useEffect(() => {
     const handleTranscription = (segments, participant) => {
-      if (participant?.isLocal) return;
-
       let finalText = '';
       let liveText = '';
 
@@ -81,12 +79,18 @@ function AgentTranscript({ transcriptRef }) {
         }
       }
 
+      // Capture ALL final turns (user + agent) for session memory
+      if (finalText && transcriptRef) {
+        const speaker = participant?.isLocal ? 'user' : 'assistant';
+        transcriptRef.current = [...transcriptRef.current, { speaker, text: finalText }];
+      }
+
+      // Visual display: agent speech only
+      if (participant?.isLocal) return;
+
       if (finalText) {
         setCommitted(prev => [...prev.slice(-1), finalText]);
         setLive('');
-        if (transcriptRef) {
-          transcriptRef.current = [...transcriptRef.current, { speaker: 'assistant', text: finalText }];
-        }
       }
       if (liveText) {
         setLive(liveText);

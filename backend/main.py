@@ -205,37 +205,85 @@ if IS_LIVEKIT_WORKER:
 
 
 KNOWLEDGE_BASE = """
-Palash Joshi is an AI Engineer and Backend Systems Architect based in Indore, India. His positioning: building scalable AI and backend systems from concept to production.
+ABOUT:
+Palash Joshi — AI Systems Engineer, Backend Architect, and Automation Engineer based in Indore, India.
+Production-focused: specializes in RAG systems, multi-agent AI workflows, backend infrastructure, automation systems, and financial AI platforms.
+Strong in end-to-end ownership: architecture, retrieval, orchestration, deployment, APIs, cloud infra, and AI workflow automation.
 
-Experience:
-- Founder and AI Engineer at QuantCortex.in, Mar 2026-present. Built a production AI financial research platform for Indian retail investors and reached 100+ users within 6 weeks.
-- AI Engineer contractor at NXL, Dec 2025-Feb 2026. Built an AI-powered SDR automation system for a UK client and improved outbound response rates from 4-5% to 13%.
-- Software Engineer at GrowwStacks, Feb 2025-Dec 2025. Delivered 80+ automation and cloud infrastructure projects, reducing manual processing time by 60-80%. Awarded Employee of the Month twice.
-- Software Engineer at Secret Weapon Trading Solutions, Mar 2024-Feb 2025. Built 100+ Python and Pine Script trading strategies and analytics pipelines tracking 15+ performance metrics.
+EXPERIENCE:
 
-Key projects:
-- QuantCortex: AI research platform for BSE-listed equities using FastAPI, Next.js, FinBERT, ChromaDB, BM25/RRF, SQLite, Groq LLaMA, Nginx, and Vercel. It uses hybrid retrieval, 3-layer OCR ingestion, and Bull/Bear/Macro multi-agent event forecasting to reduce research time by about 70%.
-- Role-Based RAG with MCP: Unified RAG platform over 10+ internal systems using hybrid vector and SQL retrieval, Pinecone, PostgreSQL, Azure OpenAI, RBAC, Docker, Terraform, and CI/CD on Azure VMs.
+1. QuantCortex — Founder & AI Engineer | Mar 2026 – Present
+Built a production AI financial research platform for Indian equities from scratch.
+- 100+ users in first 6 weeks
+- Reduced financial research time by ~70%
+Key work: system architecture, hybrid retrieval engine, multi-agent forecasting, OCR ingestion pipeline, backend APIs, auth systems, cloud deployment, frontend.
+Features: FinBERT retrieval, BM25 + RRF ranking, multi-agent analysis (Bull/Bear/Macro), event propagation engine, SSE streaming, JWT auth, financial OCR.
+Stack: Python, FastAPI, Next.js 15, FinBERT, ChromaDB, Groq LLaMA-3.3-70B, SQLite, Nginx, Vercel.
 
-Core expertise:
-- AI systems: RAG, vector search, SQL retrieval, Pinecone, ChromaDB, Azure OpenAI, MCP query orchestration, multi-agent systems, prompt engineering, intelligent document processing, LoRA/PEFT.
-- Backend: Python, FastAPI, REST APIs, GraphQL APIs, PostgreSQL, microservices.
-- Cloud and DevOps: Azure, Google Cloud Platform, Docker, Terraform, CI/CD, VMs, Nginx, Vercel, production infrastructure.
-- Automation and integrations: n8n, Make, Power Automate, OAuth2-secured API integrations, CRM integrations, Microsoft Graph, retries, rate limits, failure recovery.
-- Frontend and automation: React, Next.js, JavaScript, Selenium.
+2. NXL — AI Engineer (Contract) | Dec 2025 – Feb 2026
+Built AI-powered SDR automation system for a UK client.
+- Increased outbound response rate from 4–5% to 13% (3x improvement)
+Key work: LLM personalization pipelines, CRM automation, workflow orchestration, API integrations, LinkedIn enrichment.
+Stack: n8n, OpenAI APIs, CRM APIs, Webhooks, Automation Pipelines.
 
-Education:
-- Bachelor of Computer Applications in Data Science from Sage University, Indore, 2022-2025. Studied ML, neural networks, EDA, and DBMS.
+3. GrowwStacks — Software Engineer | Feb 2025 – Dec 2025
+Delivered 80+ automation and cloud infrastructure projects.
+- Reduced manual workflow effort by 60–80%
+- Awarded Employee of the Month twice
+Key work: automation systems, RAG platforms, API orchestration, Terraform infra, Azure deployments, CI/CD, SaaS integrations.
+Major project: Role-based enterprise RAG system with MCP query orchestration across 10+ internal systems.
+Stack: FastAPI, Docker, Azure, Pinecone, PostgreSQL, Terraform, n8n, Make.com.
 
-Differentiator:
-Palash focuses on production systems, not demos. He is strongest when he owns architecture, APIs, integrations, automation, deployment, and reliability end to end.
+4. Secret Weapon Trading Solutions — Algo Developer | Mar 2024 – Feb 2025
+Built algorithmic trading systems and analytics pipelines.
+- Developed 100+ trading strategies and Pine Script indicators
+Key work: trading strategies, multi-timeframe analytics, real-time performance tracking.
+Stack: Python, Pine Script, TradingView.
+
+KEY PROJECTS:
+
+1. QuantCortex — Production AI financial research platform for BSE-listed equities.
+   Core systems: hybrid retrieval engine, multi-agent forecasting (Bull/Bear/Macro agents), financial OCR pipeline (3-layer), event impact propagation graph, financial semantic search.
+   Architecture: FinBERT embeddings + BM25 + RRF fusion, async FastAPI backend, SSE streaming, ChromaDB vector storage.
+
+2. Role-Based Enterprise RAG Platform — Unified retrieval over 10+ enterprise systems.
+   Features: MCP query routing, RBAC-aware retrieval, hybrid vector + SQL retrieval, Terraform-managed infra.
+   Stack: FastAPI, Pinecone, PostgreSQL, Azure OpenAI, Docker, Terraform.
+
+3. AI SDR Automation Platform — AI-driven outbound sales automation.
+   Features: prospect enrichment, personalized outreach generation, CRM synchronization, multi-step workflow orchestration.
+   Outcome: 3x improvement in outbound response rates.
+
+4. Amazon Multi-Country Vendor Data Pipeline — Automated ETL and reporting system.
+   Features: Amazon Vendor API integration, multi-region data ingestion, BigQuery reporting pipeline, automated analytics workflows.
+
+TECH STACK:
+Languages: Python, JavaScript, SQL
+AI/LLM: OpenAI, Groq LLaMA, FinBERT, LangChain, Embeddings, LoRA/PEFT, Prompt Engineering
+Retrieval: ChromaDB, Pinecone, BM25, RRF, Semantic Search
+Backend: FastAPI, PostgreSQL, SQLite, REST APIs, GraphQL
+Frontend: Next.js, React, Tailwind
+Infra/DevOps: Docker, Terraform, Azure, Vercel, Nginx, CI/CD, VPS Deployment
+Automation: n8n, Make.com, Power Automate, Webhooks, OAuth2, CRM Integrations
+Monitoring: Prometheus, Grafana, Structured Logging
+
+EDUCATION:
+Bachelor of Computer Applications (Data Science) — Sage University, Indore, 2022–2025.
+
+INTERNATIONAL EXPERIENCE:
+Worked with clients and teams across UK, Middle East, Australia, Europe, and the US.
+
+DIFFERENTIATOR:
+Palash focuses on production systems, not demos. End-to-end ownership across architecture, retrieval, APIs, automation, deployment, and reliability.
 """.strip()
 
 
 def assistant_instructions(history_context: str = "") -> str:
     history_section = f"""
-Prior conversation (reference naturally if relevant, never say "last session"):
+--- Prior conversation with this visitor ---
 {history_context}
+--- End of prior conversation ---
+You were present in that conversation. You can reference it directly and accurately.
 """ if history_context else ""
 
     return f"""You are the AI assistant on Palash Joshi's portfolio, speaking with recruiters, hiring managers, or technical visitors.
@@ -246,19 +294,25 @@ Rules:
 1. Answer in 1-2 spoken sentences. Never monologue.
 2. Be warm and direct. Never robotic or stiff.
 3. Speak about Palash in third person. Never pretend to be him.
-4. For broad questions: give one concrete fact, then ask one specific scoped follow-up.
-5. For role-fit questions: give a 2-sentence match with one metric.
-6. If asked something out of scope: pivot to the closest relevant fact. Never say "I don't have that in my knowledge base", "my data", or "I don't have that detail" — just bridge naturally.
-7. Never open with "What would you like to know?" — always lead with a fact or scoped question.
-8. Only state what is in the knowledge base. Do not extrapolate or guess.
+4. Name: if you don't know the visitor's name yet, ask for it within the first 1-2 exchanges — naturally, not as a form. Once you know it, use it occasionally throughout.
+5. For broad questions: give one concrete fact, then ask one specific scoped follow-up.
+6. For role-fit questions: give a 2-sentence match with one metric.
+7. If asked something out of scope: pivot to the closest relevant fact. Never say "I don't have that in my knowledge base", "my data", or "I don't have that detail" — just bridge naturally.
+8. Never open with "What would you like to know?" — always lead with a fact or a scoped question.
+9. Only claim facts from the knowledge base or the prior conversation below. Do not extrapolate or guess.
+10. If asked what was discussed before: summarise the prior conversation directly and confidently. Never say you have no record of it.
+11. Unknown questions: if a visitor asks something about Palash that genuinely isn't in the knowledge base, say "I don't have that detail right now, but I'll flag it for Palash so he can update me." Then call the flag_question tool with the exact question.
+12. Booking CTA: when a visitor expresses hiring interest, asks about working with Palash, or the conversation reaches a natural close — say "You can book a 30-minute call with Palash directly using the Schedule Call button in the top right corner of the page."
 {history_section}
 Knowledge base:
 {KNOWLEDGE_BASE}""".strip()
 
 
+FLAGGED_FILE = Path("/tmp/portfolio-flags.jsonl")
+
 def build_portfolio_assistant(history_context: str = ""):
     patch_windows_platform_probe()
-    from livekit.agents import Agent
+    from livekit.agents import Agent, function_tool
 
     class PortfolioAssistant(Agent):
         def __init__(self):
@@ -268,12 +322,24 @@ def build_portfolio_assistant(history_context: str = ""):
             logger.info("Assistant joined the room.")
             if history_context:
                 await self.session.say(
-                    "Welcome back — picking up where we left off. What would you like to explore?"
+                    "Welcome back — great to hear from you again. What would you like to pick up on?"
                 )
             else:
                 await self.session.say(
-                    "Hi, I'm Palash's AI assistant. Ask me about his work, projects, or how he could help your team."
+                    "Hi, I'm Palash's AI assistant. Before we dive in — what's your name?"
                 )
+
+        @function_tool
+        async def flag_question(self, question: str) -> str:
+            """Flag a question about Palash that isn't covered in the knowledge base so he can review and update the assistant."""
+            entry = json.dumps({"question": question, "flagged_at": time.time()})
+            try:
+                with open(FLAGGED_FILE, "a") as f:
+                    f.write(entry + "\n")
+                logger.info(f"Flagged question: {question}")
+            except Exception as e:
+                logger.error(f"Failed to write flagged question: {e}")
+            return "Flagged."
 
     return PortfolioAssistant
 
