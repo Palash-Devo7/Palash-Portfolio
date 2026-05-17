@@ -235,9 +235,9 @@ const Hero = () => {
     historySavedRef.current = false;
 
     try {
-      const roomName = `portfolio-call-${Date.now()}`;
+      const roomName = `portfolio-call-${Date.now()}--${sessionId}`;
       const response = await fetch(
-        `https://portfolio-api.quantcortex.in/token?room=${roomName}&name=Recruiter&session_id=${sessionId}`
+        `https://portfolio-api.quantcortex.in/token?room=${roomName}&name=Recruiter`
       );
 
       if (!response.ok) throw new Error("Failed to fetch token");

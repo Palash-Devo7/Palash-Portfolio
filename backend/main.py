@@ -285,16 +285,14 @@ async def entrypoint(ctx):
     logger.info(f"Incoming job request for room: {ctx.room.name}")
     await ctx.connect()
 
-    # Read session_id from the first participant's JWT metadata
+    # Extract session_id from room name: format is portfolio-call-{timestamp}--{session_id}
     session_id = None
-    for p in ctx.room.remote_participants.values():
-        if p.metadata:
-            try:
-                meta = json.loads(p.metadata)
-                session_id = meta.get("session_id") or None
-            except Exception:
-                pass
-        break
+    room_name = ctx.room.name
+    if '--' in room_name:
+        candidate = room_name.split('--', 1)[1]
+        if _valid_sid(candidate):
+            session_id = candidate
+    logger.info(f"Room: {room_name} | Session ID: {session_id}")
 
     # Load conversation history and build context string for the LLM
     history_turns = _load_history(session_id) if session_id else []
@@ -342,7 +340,7 @@ def session_load(worker) -> float:
     return min(len(worker.active_jobs) / 2, 1.0)
 
 @app.get("/token")
-async def get_token(request: Request, room: str, name: str = "Recruiter", session_id: str = ""):
+async def get_token(request: Request, room: str, name: str = "Recruiter"):
     client_ip = request.client.host
     if not _check_rate_limit(client_ip):
         raise HTTPException(status_code=429, detail="Too many requests — try again later")
@@ -359,7 +357,6 @@ async def get_token(request: Request, room: str, name: str = "Recruiter", sessio
         raise HTTPException(status_code=500, detail="LiveKit credentials missing")
 
     now = int(time.time())
-    sid = session_id if _valid_sid(session_id) else ""
     payload = {
         "iss": key,
         "sub": name,
@@ -367,7 +364,6 @@ async def get_token(request: Request, room: str, name: str = "Recruiter", sessio
         "nbf": now,
         "exp": now + 60 * 10,
         "jti": str(uuid.uuid4()),
-        "metadata": json.dumps({"session_id": sid}) if sid else "",
         "video": {
             "roomJoin": True,
             "room": room,
