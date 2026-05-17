@@ -321,10 +321,14 @@ async def entrypoint(ctx):
     await session.start(room=ctx.room, agent=build_portfolio_assistant(history_context)())
     logger.info("Agent Session ACTIVE.")
 
-    # Hard 8-minute session limit — frontend also counts down but this is the failsafe
-    await asyncio.sleep(480)
-    logger.info("8-minute session limit reached. Disconnecting agent.")
-    await ctx.room.disconnect()
+    # Hard 8-minute failsafe — frontend countdown is the primary, this is the backstop
+    try:
+        await asyncio.sleep(480)
+        logger.info("8-minute session limit reached. Disconnecting agent.")
+        await ctx.room.disconnect()
+    except asyncio.CancelledError:
+        # Normal path — participant disconnected, LiveKit cancelled the entrypoint
+        logger.info("Entrypoint cancelled cleanly (participant disconnected).")
 
 
 def prewarm_process(proc):
