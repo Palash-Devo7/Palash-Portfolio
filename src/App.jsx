@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { LucideArrowRight, LucideCheckCircle2, LucideCpu, LucideDatabase, LucideGitBranch, LucideNetwork, LucideZap, Github, Linkedin, ChevronDown } from 'lucide-react';
@@ -61,7 +61,7 @@ const Navbar = () => {
   );
 };
 
-function AgentTranscript() {
+function AgentTranscript({ transcriptRef }) {
   const room = useRoomContext();
   const [committed, setCommitted] = useState([]); // final segments — fade to history
   const [live, setLive] = useState('');            // non-final segments — updates word-by-word
@@ -84,6 +84,9 @@ function AgentTranscript() {
       if (finalText) {
         setCommitted(prev => [...prev.slice(-1), finalText]);
         setLive('');
+        if (transcriptRef) {
+          transcriptRef.current = [...transcriptRef.current, { speaker: 'assistant', text: finalText }];
+        }
       }
       if (liveText) {
         setLive(liveText);
@@ -121,15 +124,68 @@ function AgentTranscript() {
   );
 }
 
-function SessionControls({ onTerminate }) {
+function AudioUnlocker() {
   const room = useRoomContext();
+  useEffect(() => { room.startAudio(); }, [room]);
+  return null;
+}
+
+function SessionPanel({ sessionId, transcriptRef, historySavedRef }) {
+  const room = useRoomContext();
+  const [timeLeft, setTimeLeft] = useState(8 * 60);
+  const saveAndEndRef = useRef(null);
+
+  const saveAndEnd = useCallback(async () => {
+    if (!historySavedRef.current && transcriptRef.current.length > 0) {
+      historySavedRef.current = true;
+      try {
+        await fetch(`https://portfolio-api.quantcortex.in/history/${sessionId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ turns: transcriptRef.current }),
+        });
+      } catch (e) {
+        console.error('Failed to save history:', e);
+      }
+    }
+    await room.disconnect();
+  }, [room, sessionId, transcriptRef, historySavedRef]);
+
+  // Always keep the ref pointing to the latest saveAndEnd
+  useEffect(() => { saveAndEndRef.current = saveAndEnd; });
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          saveAndEndRef.current?.();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const minutes = Math.floor(timeLeft / 60);
+  const seconds = timeLeft % 60;
+
   return (
-    <button
-      onClick={async () => { await room.disconnect(); onTerminate(); }}
-      className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] transition-all hover:bg-red-500/10 hover:border-red-500/20 hover:text-red-400 group"
-    >
-      Terminate Session
-    </button>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between text-[9px] font-black tracking-[0.2em] uppercase">
+        <span className="text-white/40">Session</span>
+        <span className={timeLeft < 60 ? 'text-red-400' : 'text-white/40'}>
+          {minutes}:{seconds.toString().padStart(2, '0')}
+        </span>
+      </div>
+      <button
+        onClick={saveAndEnd}
+        className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] transition-all hover:bg-red-500/10 hover:border-red-500/20 hover:text-red-400"
+      >
+        Terminate Session
+      </button>
+    </div>
   );
 }
 
@@ -137,14 +193,52 @@ const Hero = () => {
   const containerRef = useRef(null);
   const [token, setToken] = useState("");
   const [connectionUrl, setConnectionUrl] = useState("");
-  const [agentStatus, setAgentStatus] = useState("idle"); // idle, connecting, success, error
+  const [agentStatus, setAgentStatus] = useState("idle"); // idle, connecting, success, error, ended
+
+  const [sessionId] = useState(() => {
+    let sid = localStorage.getItem('portfolio_session_id');
+    if (!sid) {
+      sid = crypto.randomUUID();
+      localStorage.setItem('portfolio_session_id', sid);
+    }
+    return sid;
+  });
+  const [hasHistory, setHasHistory] = useState(false);
+  const transcriptRef = useRef([]);
+  const historySavedRef = useRef(false);
+
+  // Check for existing saved history on mount
+  useEffect(() => {
+    fetch(`https://portfolio-api.quantcortex.in/history/${sessionId}`)
+      .then(r => r.json())
+      .then(data => setHasHistory(data.has_history))
+      .catch(() => {});
+  }, [sessionId]);
+
+  // sendBeacon on tab close — browser-guaranteed delivery
+  useEffect(() => {
+    const handleUnload = () => {
+      if (!historySavedRef.current && transcriptRef.current.length > 0) {
+        navigator.sendBeacon(
+          `https://portfolio-api.quantcortex.in/history/${sessionId}`,
+          new Blob([JSON.stringify({ turns: transcriptRef.current })], { type: 'application/json' })
+        );
+      }
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    return () => window.removeEventListener('beforeunload', handleUnload);
+  }, [sessionId]);
 
   const handleSummon = async () => {
     setAgentStatus("connecting");
+    transcriptRef.current = [];
+    historySavedRef.current = false;
 
     try {
       const roomName = `portfolio-call-${Date.now()}`;
-      const response = await fetch(`https://portfolio-api.quantcortex.in/token?room=${roomName}&name=Recruiter`);
+      const response = await fetch(
+        `https://portfolio-api.quantcortex.in/token?room=${roomName}&name=Recruiter&session_id=${sessionId}`
+      );
 
       if (!response.ok) throw new Error("Failed to fetch token");
 
@@ -225,17 +319,27 @@ const Hero = () => {
             </div>
 
             <div className="space-y-4 relative z-10">
-              {agentStatus === "idle" ? (
-                <button
-                  onClick={handleSummon}
-                  className="w-full py-4 bg-charcoal text-white rounded-[1.25rem] text-[9px] font-black uppercase tracking-[0.2em] transition-all hover:bg-accentTan hover:text-charcoal hover:scale-[1.02] active:scale-95 shadow-xl flex flex-col items-center justify-center gap-1 group border border-white/5"
-                >
-                  <div className="flex items-center gap-2">
-                    <span>Start Voice Chat</span>
-                    <LucideZap size={12} className="group-hover:animate-bounce" />
-                  </div>
-                  <span className="text-[7px] text-white/40 tracking-[0.2em] font-bold group-hover:text-charcoal/60 transition-colors">Uplink: Ready</span>
-                </button>
+              {agentStatus === "idle" || agentStatus === "ended" ? (
+                <div className="space-y-3">
+                  {agentStatus === "ended" && (
+                    <div className="flex items-center justify-center gap-2 py-1">
+                      <div className="w-1.5 h-1.5 rounded-full bg-green-400"></div>
+                      <span className="text-[9px] font-black tracking-[0.2em] uppercase text-white/50">Session Archived</span>
+                    </div>
+                  )}
+                  <button
+                    onClick={handleSummon}
+                    className="w-full py-4 bg-charcoal text-white rounded-[1.25rem] text-[9px] font-black uppercase tracking-[0.2em] transition-all hover:bg-accentTan hover:text-charcoal hover:scale-[1.02] active:scale-95 shadow-xl flex flex-col items-center justify-center gap-1 group border border-white/5"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>{agentStatus === "ended" ? 'Continue Conversation' : hasHistory ? 'Resume Conversation' : 'Start Voice Chat'}</span>
+                      <LucideZap size={12} className="group-hover:animate-bounce" />
+                    </div>
+                    <span className="text-[7px] text-white/40 tracking-[0.2em] font-bold group-hover:text-charcoal/60 transition-colors">
+                      {hasHistory || agentStatus === "ended" ? 'Memory Active' : 'Uplink: Ready'}
+                    </span>
+                  </button>
+                </div>
               ) : agentStatus === "connecting" ? (
                 <div className="bg-charcoal text-white rounded-2xl p-6 space-y-4 animate-pulse">
                   <div className="flex items-center justify-center h-10 gap-1.5">
@@ -261,13 +365,23 @@ const Hero = () => {
                       setAgentStatus("error");
                     }}
                     onDisconnected={() => {
-                      setAgentStatus("idle");
+                      // sendBeacon fallback if terminate button wasn't used
+                      if (!historySavedRef.current && transcriptRef.current.length > 0) {
+                        historySavedRef.current = true;
+                        navigator.sendBeacon(
+                          `https://portfolio-api.quantcortex.in/history/${sessionId}`,
+                          new Blob([JSON.stringify({ turns: transcriptRef.current })], { type: 'application/json' })
+                        );
+                      }
+                      setHasHistory(transcriptRef.current.length > 0);
+                      setAgentStatus(transcriptRef.current.length > 0 ? "ended" : "idle");
                       setToken("");
                       setConnectionUrl("");
                     }}
                     className="relative z-10 flex flex-col items-center gap-6"
                   >
                     <RoomAudioRenderer />
+                    <AudioUnlocker />
 
                     {/* Minimal Header */}
                     <div className="w-full flex items-center justify-between">
@@ -292,9 +406,9 @@ const Hero = () => {
                       </div>
                     </div>
 
-                    <AgentTranscript />
+                    <AgentTranscript transcriptRef={transcriptRef} />
 
-                    <SessionControls onTerminate={() => { setToken(""); setAgentStatus("idle"); }} />
+                    <SessionPanel sessionId={sessionId} transcriptRef={transcriptRef} historySavedRef={historySavedRef} />
                   </LiveKitRoom>
                 </div>
               ) : (

@@ -1,4 +1,7 @@
+import asyncio
+import json
 import os
+import re
 import dataclasses
 import logging
 import platform
@@ -9,14 +12,44 @@ import uuid
 import numpy as np
 from dotenv import load_dotenv
 from collections import defaultdict
+from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import jwt
 
 _rate_store: dict = defaultdict(list)
 _rate_lock = threading.Lock()
 RATE_MAX = 5
 RATE_WINDOW = 60
+
+SESSIONS_DIR = Path("/tmp/portfolio-sessions")
+_SESSION_RE = re.compile(r'^[a-f0-9\-]{8,64}$')
+
+def _valid_sid(sid: str) -> bool:
+    return bool(sid and _SESSION_RE.match(sid))
+
+def _save_history(session_id: str, turns: list) -> None:
+    if not _valid_sid(session_id):
+        return
+    SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+    path = SESSIONS_DIR / f"{session_id}.json"
+    path.write_text(json.dumps({"turns": turns, "saved_at": time.time()}))
+
+def _load_history(session_id: str) -> list:
+    if not _valid_sid(session_id):
+        return []
+    path = SESSIONS_DIR / f"{session_id}.json"
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text())
+        if time.time() - data.get("saved_at", 0) > 86400:  # 24h TTL
+            path.unlink(missing_ok=True)
+            return []
+        return data.get("turns", [])
+    except Exception:
+        return []
 
 def _check_rate_limit(ip: str) -> bool:
     now = time.time()
@@ -199,39 +232,48 @@ Palash focuses on production systems, not demos. He is strongest when he owns ar
 """.strip()
 
 
-def assistant_instructions() -> str:
-    return f"""
-You are the AI assistant on Palash Joshi's portfolio, speaking with recruiters, hiring managers, or technical visitors.
+def assistant_instructions(history_context: str = "") -> str:
+    history_section = f"""
+Prior conversation (reference naturally if relevant, never say "last session"):
+{history_context}
+""" if history_context else ""
+
+    return f"""You are the AI assistant on Palash Joshi's portfolio, speaking with recruiters, hiring managers, or technical visitors.
+
+Scope: Only discuss Palash's work experience, skills, projects, tech stack, education, and hiring availability. Nothing else.
 
 Rules:
-- Answer in 1-2 spoken sentences. Never monologue.
-- Be warm and direct. Let the visitor lead.
-- Speak about Palash in third person. Never pretend to be him.
-- For broad questions give one key fact then ask what to unpack.
-- For role-fit questions give a 2-sentence match with one concrete metric.
-- If unsure, say you don't have that detail.
-- Answer directly — no "according to the resume" phrases.
-
+1. Answer in 1-2 spoken sentences. Never monologue.
+2. Be warm and direct. Never robotic or stiff.
+3. Speak about Palash in third person. Never pretend to be him.
+4. For broad questions: give one concrete fact, then ask one specific scoped follow-up.
+5. For role-fit questions: give a 2-sentence match with one metric.
+6. If asked something out of scope: pivot to the closest relevant fact. Never say "I don't have that in my knowledge base", "my data", or "I don't have that detail" — just bridge naturally.
+7. Never open with "What would you like to know?" — always lead with a fact or scoped question.
+8. Only state what is in the knowledge base. Do not extrapolate or guess.
+{history_section}
 Knowledge base:
-{KNOWLEDGE_BASE}
-""".strip()
+{KNOWLEDGE_BASE}""".strip()
 
 
-def build_portfolio_assistant():
+def build_portfolio_assistant(history_context: str = ""):
     patch_windows_platform_probe()
     from livekit.agents import Agent
 
     class PortfolioAssistant(Agent):
         def __init__(self):
-            super().__init__(
-                instructions=assistant_instructions()
-            )
+            super().__init__(instructions=assistant_instructions(history_context))
 
         async def on_enter(self):
             logger.info("Assistant joined the room.")
-            await self.session.say(
-                "Hi, I'm Palash's AI assistant. What would you like to know about him?"
-            )
+            if history_context:
+                await self.session.say(
+                    "Welcome back — picking up where we left off. What would you like to explore?"
+                )
+            else:
+                await self.session.say(
+                    "Hi, I'm Palash's AI assistant. Ask me about his work, projects, or how he could help your team."
+                )
 
     return PortfolioAssistant
 
@@ -242,7 +284,26 @@ async def entrypoint(ctx):
 
     logger.info(f"Incoming job request for room: {ctx.room.name}")
     await ctx.connect()
-    
+
+    # Read session_id from the first participant's JWT metadata
+    session_id = None
+    for p in ctx.room.remote_participants.values():
+        if p.metadata:
+            try:
+                meta = json.loads(p.metadata)
+                session_id = meta.get("session_id") or None
+            except Exception:
+                pass
+        break
+
+    # Load conversation history and build context string for the LLM
+    history_turns = _load_history(session_id) if session_id else []
+    history_context = ""
+    if history_turns:
+        lines = [f"{t['speaker'].capitalize()}: {t['text']}" for t in history_turns[-10:]]
+        history_context = "\n".join(lines)
+        logger.info(f"Loaded {len(history_turns)} history turns for session {session_id}")
+
     dg_key = deepgram_rotator.next()
     groq_key = groq_rotator.next()
 
@@ -259,8 +320,13 @@ async def entrypoint(ctx):
         turn_handling=TurnHandlingOptions(turn_detection="vad"),
     )
 
-    await session.start(room=ctx.room, agent=build_portfolio_assistant()())
+    await session.start(room=ctx.room, agent=build_portfolio_assistant(history_context)())
     logger.info("Agent Session ACTIVE.")
+
+    # Hard 8-minute session limit — frontend also counts down but this is the failsafe
+    await asyncio.sleep(480)
+    logger.info("8-minute session limit reached. Disconnecting agent.")
+    await ctx.room.disconnect()
 
 
 def prewarm_process(proc):
@@ -276,7 +342,7 @@ def session_load(worker) -> float:
     return min(len(worker.active_jobs) / 2, 1.0)
 
 @app.get("/token")
-async def get_token(request: Request, room: str, name: str = "Recruiter"):
+async def get_token(request: Request, room: str, name: str = "Recruiter", session_id: str = ""):
     client_ip = request.client.host
     if not _check_rate_limit(client_ip):
         raise HTTPException(status_code=429, detail="Too many requests — try again later")
@@ -291,8 +357,9 @@ async def get_token(request: Request, room: str, name: str = "Recruiter"):
 
     if not url or not key or not secret:
         raise HTTPException(status_code=500, detail="LiveKit credentials missing")
-        
+
     now = int(time.time())
+    sid = session_id if _valid_sid(session_id) else ""
     payload = {
         "iss": key,
         "sub": name,
@@ -300,6 +367,7 @@ async def get_token(request: Request, room: str, name: str = "Recruiter"):
         "nbf": now,
         "exp": now + 60 * 10,
         "jti": str(uuid.uuid4()),
+        "metadata": json.dumps({"session_id": sid}) if sid else "",
         "video": {
             "roomJoin": True,
             "room": room,
@@ -310,6 +378,21 @@ async def get_token(request: Request, room: str, name: str = "Recruiter"):
     }
     token = jwt.encode(payload, secret, algorithm="HS256")
     return {"token": token, "url": url}
+
+
+class HistoryPayload(BaseModel):
+    turns: list
+
+@app.get("/history/{session_id}")
+async def get_history(session_id: str):
+    turns = _load_history(session_id)
+    return {"turns": turns, "has_history": len(turns) > 0}
+
+@app.post("/history/{session_id}")
+async def post_history(session_id: str, payload: HistoryPayload):
+    _save_history(session_id, payload.turns)
+    return {"ok": True}
+
 
 if __name__ == "__main__":
     patch_windows_platform_probe()
